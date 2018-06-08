@@ -28,7 +28,8 @@ import compare from '../middleware/compare.js'
 ------------------*/
 import Hook from '../utils/hook.js'
 import Biz from '../utils/biz.js'
-import { doCommand } from '../utils/process.js'
+import { doCommand, execShell } from '../utils/process.js'
+import { loadPlugin } from '../utils/plugin.js'
 
 /*-----------------
   about router
@@ -83,35 +84,6 @@ if(fs.existsSync(configPath)){
   config = _.assign(config, require(configPath));
 }
 
-const loadPlugin = function(fpm){
-  let modulesDir = path.join(CWD, 'node_modules')
-  let files = fs.readdirSync(modulesDir)
-  files = _.filter(files, (f)=>{
-    return _.startsWith(f, 'fpm-plugin-')
-  })
-  //load package.json
-  let plugins = {}
-  _.map(files, (f)=>{
-    let packageInfo = require(path.join(modulesDir, f, 'package.json'))
-    plugins[packageInfo.name] = { name: packageInfo.name, version: packageInfo.version, info: packageInfo, npm:`https://www.npmjs.com/package/${packageInfo.name}`, registry: `http://registry.npmjs.org/${packageInfo.name}` }
-  })
-  _.map(plugins, (p) => {
-    let m = require(path.join(modulesDir, p.name))
-    if(_.has(m, 'default')){
-      m = m.default
-    }
-    if(_.isFunction(m.getDependencies)){
-      let deps = m.getDependencies() || []
-      _.map(deps, (d) => {
-        if(!_.has(plugins, d.name)){
-          throw new Exception(E.System.PLUGIN_LOAD_ERROR(p.name, d.name))
-        }
-      })
-    }
-    p.ref = m.bind(fpm)
-  })
-  fpm._plugins = _.assign(fpm._plugins, plugins)
-}
 
 class Fpm {
   constructor(){
@@ -128,6 +100,7 @@ class Fpm {
       'CWD': CWD,
     }
     this.doCommand = doCommand
+    this.execShell = execShell
     this._biz_module = {}
     this._hook = new Hook()
     this._action = {}
@@ -136,10 +109,9 @@ class Fpm {
     this._prject_info = projectInfo
     this._env = config.dev
     this._version = packageInfo.version
-    this._plugins = {}
-
     //add plugins
-    loadPlugin(this)
+    this._plugins = loadPlugin(this) || {}
+    this._publish_topics = []
     this.runAction('INIT', this)
     this.errorHandler = (err, ctx) => {
     	this.logger.error('server error', err, ctx)
@@ -239,22 +211,22 @@ class Fpm {
   }
 
   async execute(method, args, v, ctx){
-    return await core(method, args, v, this, ctx)
+    return await core(method, args, v || config.defaultVersion , this, ctx)
   }
 
   addAfterHook(method, hookHandler, v, priority){
-    return this._hook.addAfterHook(method, hookHandler, v, priority)
+    return this._hook.addAfterHook(method, hookHandler, v || config.defaultVersion, priority)
   }
 
   addBeforeHook(method, hookHandler, v, priority){
-    return this._hook.addBeforeHook(method, hookHandler, v, priority)
+    return this._hook.addBeforeHook(method, hookHandler, v || config.defaultVersion, priority)
   }
 
-  getConfig(c){
+  getConfig(c, defaultValue){
     if(_.isEmpty(c)){
       return config
     }
-    return config[c]
+    return config[c] || (defaultValue || {})
   }
 
   extendConfig(c){
@@ -271,7 +243,10 @@ class Fpm {
   }
 
   publish(topic, data){
-    PubSub.publish(topic, data)
+    if(!_.includes(this._publish_topics, topic)){
+      this._publish_topics.push(topic)
+    }
+    PubSub.publish(topic, data)    
   }
 
   subscribe(topic, callback){

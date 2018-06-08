@@ -1,3 +1,38 @@
+# 2.4.10.1 (2018-06-07)
+BugFix:
+- `publish(topic, data)`
+
+# 2.4.10 (2018-06-07)
+Modify:
+- `async execute(method, args, v, ctx)` The `v` Change To Be Optional
+- add `fpm._publish_topics`, it save all the topics published by the biz functions
+- `publish(topic, data)` , It May Throw An Exception When The TOPIC Published By Other Function
+
+# 2.4.9 (2018-05-31)
+BugFix:
+- masterkey lost from 
+  before: `let sign = (args) => {` ; after: `let sign = (args, apps) => {`
+  
+
+# 2.4.7 (2018-05-31)
+Add:
+- `execShell(shellPath:String!, params:[]?) => Promise`
+  Add an execShell method For Run `.sh` or `.bat` files. 
+ 
+  *The ShellPath Should Be An Abstract Path*
+BugFix:
+- `Digest already called` AT File `yf-fpm-server/lib/utils/kit.js:25:7`
+  https://github.com/nodejs/node-v0.x-archive/issues/1415
+
+# 2.4.2 (2018-05-28)
+Update:
+- `loadPlugin`
+  - Add Field `package` For Each Plugin, It links this origin reference of the plugin module
+  - Add Field `isBound` For Each Plugin, It means plugin invoke `bind()` ok
+
+Files:
+- Move `loadPlugin` from `bin\app.js` to `utils\plugin.js`
+
 # 2.4.1 (2018-05-26)
 Add 3 Field For Plugin:
 - info: `packageInfo` 
